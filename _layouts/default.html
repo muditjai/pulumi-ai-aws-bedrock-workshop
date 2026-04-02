@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title | default: site.title }}</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Primer/21.0.7/primer.css">
+  <style>
+    .markdown-body {
+      box-sizing: border-box;
+      min-width: 200px;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 45px;
+    }
+    @media (max-width: 767px) {
+      .markdown-body {
+        padding: 15px;
+      }
+    }
+    .theme-toggle {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      z-index: 100;
+      background: var(--color-bg-default);
+      border: 1px solid var(--color-border-default);
+      border-radius: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+    <span id="theme-icon">&#9728;</span>
+  </button>
+
+  <article class="markdown-body">
+    {{ content }}
+  </article>
+
+  {% include mermaid.html %}
+
+  <script>
+    function getTheme() {
+      return localStorage.getItem('theme') || 'auto';
+    }
+
+    function setTheme(theme) {
+      const html = document.documentElement;
+      localStorage.setItem('theme', theme);
+      html.setAttribute('data-color-mode', theme === 'auto' ? 'auto' : theme);
+      html.setAttribute('data-light-theme', 'light');
+      html.setAttribute('data-dark-theme', 'dark');
+      document.getElementById('theme-icon').innerHTML =
+        theme === 'dark' ? '&#9790;' : theme === 'light' ? '&#9728;' : '&#9881;';
+    }
+
+    function toggleTheme() {
+      const current = getTheme();
+      const next = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
+      setTheme(next);
+    }
+
+    setTheme(getTheme());
+  </script>
+</body>
+</html>

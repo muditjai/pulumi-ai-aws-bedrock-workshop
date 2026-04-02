@@ -1,0 +1,28 @@
+# Pulumi ESC environment for AWS OIDC authentication
+#
+# This environment configures short-lived AWS credentials via OIDC federation.
+# Pulumi Cloud acts as the identity provider — no static access keys needed.
+#
+# To use this template:
+# 1. Replace <YOUR_AWS_ACCOUNT_ID> with your AWS account ID
+# 2. Replace <YOUR_OIDC_ROLE_ARN> with the ARN of your OIDC-federated IAM role
+# 3. Set the desired AWS region
+#
+# Create the environment:
+#   pulumi env init pulumi-idp/auth
+#   pulumi env edit pulumi-idp/auth  (paste this content)
+
+values:
+  aws:
+    login:
+      fn::open::aws-login:
+        oidc:
+          duration: 1h
+          roleArn: <YOUR_OIDC_ROLE_ARN>
+          sessionName: pulumi-workshop
+  environmentVariables:
+    AWS_ACCESS_KEY_ID: ${aws.login.accessKeyId}
+    AWS_SECRET_ACCESS_KEY: ${aws.login.secretAccessKey}
+    AWS_SESSION_TOKEN: ${aws.login.sessionToken}
+  pulumiConfig:
+    aws:region: us-east-1

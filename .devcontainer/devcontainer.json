@@ -1,0 +1,22 @@
+{
+  "name": "Pulumi AI AWS Bedrock Workshop",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "pulumi.pulumi-vscode",
+        "amazonwebservices.aws-toolkit-vscode",
+        "ms-python.python",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "forwardPorts": [],
+  "postCreateCommand": "pulumi version && aws --version && node --version && python3 --version"
+}

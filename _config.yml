@@ -1,0 +1,19 @@
+title: "Deploying AI Agents on AWS with Pulumi and Amazon Bedrock AgentCore"
+author: Engin Diri
+description: "A hands-on workshop for deploying AI agents on AWS using Pulumi and Amazon Bedrock AgentCore"
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: true
+include:
+  - "00-setup-and-orientation.md"
+  - "01-your-first-agent.md"
+  - "02-mcp-server-jwt-auth.md"
+  - "03-multi-agent-orchestration.md"
+  - "04-full-stack-weather-agent.md"
+  - "05-housekeeping.md"
