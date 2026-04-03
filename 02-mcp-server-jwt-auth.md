@@ -69,7 +69,7 @@ flowchart TD
     D -->|AgentCore pulls image| E["AgentCore Runtime\n(MCP server)"]
 
     F["Cognito User Pool"] -->|JWT discovery URL| G["AgentCore Gateway\n(JWT auth + Cedar policies)"]
-    G -->|Gateway Target\n(SigV4 via IAM role)| E
+    G -->|Gateway Target, SigV4 via IAM role| E
 
     H["Client"] -->|JWT token| G
 ```
