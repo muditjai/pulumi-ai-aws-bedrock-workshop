@@ -19,19 +19,25 @@ function generateHtml(
 ): string {
   const cards = Object.entries(kvPairs)
     .map(
-      ([key, value]) => `
-        <div class="card group" data-value="${value.replace(/"/g, "&quot;")}">
-          <div class="card-label">${key}</div>
-          <div class="card-value-row">
-            <code class="card-value" title="${value.replace(/"/g, "&quot;")}">${value}</code>
-            <button class="copy-btn" onclick="copyValue(this)" aria-label="Copy ${key}">
-              <svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <svg class="icon-check hidden" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>
+      ([key, value], i) => `
+      <div class="card" data-value="${value.replace(/"/g, "&quot;")}" onclick="copyCard(this)" style="animation-delay: ${0.1 + i * 0.08}s">
+        <div class="card-inner">
+          <div class="card-left">
+            <span class="card-key">${key}</span>
+            <code class="card-val">${value}</code>
           </div>
-        </div>`,
+          <div class="card-action">
+            <span class="action-label">COPY</span>
+            <span class="action-done">COPIED</span>
+          </div>
+        </div>
+        <div class="card-flash"></div>
+      </div>`,
     )
     .join("\n");
+
+  const count = Object.keys(kvPairs).length;
+  const now = new Date().toISOString().split("T")[0];
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -41,42 +47,63 @@ function generateHtml(
   <title>${title}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0a0a0f;
-      --surface: #12121a;
-      --surface-hover: #1a1a26;
-      --border: #2a2a3a;
-      --border-accent: #6366f1;
-      --text: #e4e4ed;
-      --text-dim: #8888a0;
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.15);
-      --success: #22c55e;
-      --font-body: 'Instrument Sans', system-ui, sans-serif;
-      --font-mono: 'DM Mono', 'SF Mono', monospace;
+      --bg: #08080c;
+      --surface: rgba(255,255,255,0.03);
+      --surface-hover: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.07);
+      --amber: #f0a830;
+      --amber-dim: #c78520;
+      --amber-glow: rgba(240,168,48,0.08);
+      --amber-flash: rgba(240,168,48,0.15);
+      --green: #34d399;
+      --text: #d4d4d8;
+      --text-dim: #63636e;
+      --font-display: 'Outfit', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
     }
 
+    html { font-size: 16px; }
+
     body {
-      font-family: var(--font-body);
+      font-family: var(--font-display);
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Subtle grid background */
-    body::before {
+    /* Scanline overlay */
+    body::after {
       content: '';
       position: fixed;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* Ambient glow */
+    .glow {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--amber-glow) 0%, transparent 70%);
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
       pointer-events: none;
       z-index: 0;
     }
@@ -84,144 +111,209 @@ function generateHtml(
     .container {
       position: relative;
       z-index: 1;
-      max-width: 720px;
+      max-width: 680px;
       margin: 0 auto;
-      padding: 80px 24px 60px;
+      padding: 72px 24px 80px;
     }
 
     @media (max-width: 640px) {
-      .container { padding: 40px 16px 40px; }
+      .container { padding: 40px 16px 48px; }
     }
 
     /* Header */
-    .header {
-      margin-bottom: 56px;
-      text-align: center;
-    }
+    .header { margin-bottom: 48px; }
 
-    .badge {
-      display: inline-block;
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
       font-family: var(--font-mono);
       font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--accent);
-      background: var(--accent-glow);
-      border: 1px solid rgba(99, 102, 241, 0.25);
-      border-radius: 100px;
-      padding: 6px 16px;
-      margin-bottom: 24px;
+      color: var(--text-dim);
+    }
+
+    .header-meta .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
 
     h1 {
-      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 4.5vw, 2.2rem);
       font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
       color: #fff;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    h1 .highlight {
+      color: var(--amber);
     }
 
     .subtitle {
-      font-size: 15px;
+      font-family: var(--font-mono);
+      font-size: 13px;
       color: var(--text-dim);
-      line-height: 1.5;
+      line-height: 1.6;
+    }
+
+    .subtitle kbd {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      padding: 1px 6px;
+      vertical-align: 1px;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 32px 0;
     }
 
     /* Cards */
     .cards {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
     }
 
     .card {
+      position: relative;
+      overflow: hidden;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 24px;
-      transition: border-color 0.2s, background 0.2s;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      animation: slideIn 0.4s ease-out both;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .card:hover {
-      border-color: var(--border-accent);
+      border-color: rgba(240,168,48,0.25);
       background: var(--surface-hover);
     }
 
-    .card-label {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      margin-bottom: 10px;
+    .card:active {
+      transform: scale(0.995);
     }
 
-    .card-value-row {
+    .card-inner {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      padding: 18px 20px;
+      gap: 16px;
+      position: relative;
+      z-index: 2;
     }
 
-    .card-value {
+    .card-left {
       flex: 1;
+      min-width: 0;
+    }
+
+    .card-key {
+      display: block;
       font-family: var(--font-mono);
-      font-size: 14px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--amber-dim);
+      margin-bottom: 6px;
+    }
+
+    .card-val {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
       font-weight: 400;
       color: var(--text);
       word-break: break-all;
       line-height: 1.5;
       background: none;
-      padding: 0;
     }
 
-    .copy-btn {
+    .card-action {
       flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: transparent;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
       color: var(--text-dim);
-      cursor: pointer;
-      transition: all 0.15s;
+      transition: color 0.15s;
     }
 
-    .copy-btn:hover {
-      color: var(--accent);
-      border-color: var(--accent);
-      background: var(--accent-glow);
+    .card:hover .card-action { color: var(--amber); }
+
+    .card-action .action-done {
+      display: none;
+      color: var(--green);
     }
 
-    .copy-btn.copied {
-      color: var(--success);
-      border-color: var(--success);
-      background: rgba(34, 197, 94, 0.1);
+    .card.copied .action-label { display: none; }
+    .card.copied .action-done { display: inline; }
+
+    /* Flash effect on copy */
+    .card-flash {
+      position: absolute;
+      inset: 0;
+      background: var(--amber-flash);
+      opacity: 0;
+      z-index: 1;
+      pointer-events: none;
+      transition: opacity 0.4s;
     }
 
-    .hidden { display: none; }
+    .card.flash .card-flash {
+      opacity: 1;
+      transition: opacity 0s;
+    }
 
     /* Toast */
     .toast {
       position: fixed;
-      bottom: 32px;
+      bottom: 28px;
       left: 50%;
-      transform: translateX(-50%) translateY(20px);
+      transform: translateX(-50%) translateY(16px);
       font-family: var(--font-mono);
-      font-size: 13px;
-      color: var(--success);
-      background: #0f1f15;
-      border: 1px solid rgba(34, 197, 94, 0.3);
-      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--green);
+      background: rgba(8,8,12,0.95);
+      border: 1px solid rgba(52,211,153,0.2);
+      border-radius: 6px;
       padding: 10px 20px;
       opacity: 0;
-      transition: opacity 0.2s, transform 0.2s;
+      transition: opacity 0.25s, transform 0.25s;
       pointer-events: none;
-      z-index: 100;
+      z-index: 999;
+      backdrop-filter: blur(12px);
     }
 
     .toast.show {
@@ -231,61 +323,67 @@ function generateHtml(
 
     /* Footer */
     .footer {
-      margin-top: 56px;
-      text-align: center;
-      font-size: 13px;
+      margin-top: 48px;
+      font-family: var(--font-mono);
+      font-size: 11px;
       color: var(--text-dim);
+      text-align: center;
+      letter-spacing: 0.02em;
     }
 
     .footer a {
-      color: var(--accent);
+      color: var(--amber-dim);
       text-decoration: none;
     }
-
     .footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
+  <div class="glow"></div>
+
   <div class="container">
     <header class="header">
-      <div class="badge">Workshop Credentials</div>
-      <h1>${title}</h1>
-      <p class="subtitle">Click the copy button next to any value to copy it to your clipboard.</p>
+      <div class="header-meta">
+        <span class="dot"></span>
+        <span>live &middot; ${count} values &middot; ${now}</span>
+      </div>
+      <h1>${title.replace("Pulumi", '<span class="highlight">Pulumi</span>').replace("AgentCore", '<span class="highlight">AgentCore</span>')}</h1>
+      <p class="subtitle">Click any row to copy its value. Works on mobile too.</p>
     </header>
+
+    <div class="divider"></div>
 
     <div class="cards">
       ${cards}
     </div>
 
+    <div class="divider"></div>
+
     <footer class="footer">
-      Powered by <a href="https://www.pulumi.com" target="_blank">Pulumi</a> &middot; Values served from Pulumi ESC
+      Served from <a href="https://www.pulumi.com/product/esc/" target="_blank">Pulumi ESC</a> &middot; Deployed with <a href="https://www.pulumi.com" target="_blank">Pulumi</a>
     </footer>
   </div>
 
-  <div class="toast" id="toast">Copied to clipboard</div>
+  <div class="toast" id="toast"></div>
 
   <script>
-    function copyValue(btn) {
-      const card = btn.closest('.card');
+    function copyCard(card) {
       const value = card.dataset.value;
       navigator.clipboard.writeText(value).then(() => {
-        // Button feedback
-        const iconCopy = btn.querySelector('.icon-copy');
-        const iconCheck = btn.querySelector('.icon-check');
-        iconCopy.classList.add('hidden');
-        iconCheck.classList.remove('hidden');
-        btn.classList.add('copied');
+        // Flash
+        card.classList.add('flash', 'copied');
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => card.classList.remove('flash'));
+        });
 
         // Toast
+        const label = card.querySelector('.card-key').textContent;
         const toast = document.getElementById('toast');
-        const label = card.querySelector('.card-label').textContent;
-        toast.textContent = label + ' copied!';
+        toast.textContent = label + ' copied to clipboard';
         toast.classList.add('show');
 
         setTimeout(() => {
-          iconCopy.classList.remove('hidden');
-          iconCheck.classList.add('hidden');
-          btn.classList.remove('copied');
+          card.classList.remove('copied');
           toast.classList.remove('show');
         }, 2000);
       });
