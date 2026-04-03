@@ -7,7 +7,7 @@
 **Precedence:** the **closest `AGENTS.md`** to the files you're changing wins. Root holds global defaults only.
 
 ## Commands (unverified)
-> Source: defaults — CI-sourced commands are most reliable
+> Source: Makefile — CI-sourced commands are most reliable
 
 <!-- AGENTS-GENERATED:START commands -->
 | Task | Command | ~Time |
@@ -41,6 +41,7 @@ _includes/       → project files
 <!-- AGENTS-GENERATED:START heuristics -->
 | When | Do |
 |------|-----|
+| Running tasks | Check `make help` for available commands |
 | Adding dependency | Ask first - we minimize deps |
 | Unsure about pattern | Check Golden Samples above |
 <!-- AGENTS-GENERATED:END heuristics -->

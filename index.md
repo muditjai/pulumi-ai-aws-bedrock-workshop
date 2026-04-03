@@ -63,8 +63,9 @@ Your agents will deploy as containerized services on AgentCore Runtime, authenti
 - AWS account with Bedrock model access enabled (provided for the workshop)
 - [Pulumi account](https://app.pulumi.com/signup) (free tier works)
 - GitHub account
-- Node.js 18+ and Python 3.11+ installed
-- Python packages for testing: `pip install boto3 mcp`
+- **TypeScript path**: Node.js 18+ installed
+- **Python path**: Python 3.11+ and [uv](https://docs.astral.sh/uv/) installed
+- Python 3.11+ for agent code and testing (both paths): `pip install boto3 mcp`
 - Basic terminal familiarity
 
 We recommend **GitHub Codespaces** for a zero-install experience. Click the badge at the top of this page.

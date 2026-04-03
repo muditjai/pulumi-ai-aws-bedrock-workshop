@@ -1,0 +1,94 @@
+<style>
+  .lang-tabs {
+    position: relative;
+    margin: 1em 0;
+  }
+  .lang-tab-buttons {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--color-border-default, #d0d7de);
+    margin-bottom: 0;
+  }
+  .lang-tab-btn {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-fg-muted, #656d76);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .lang-tab-btn:hover {
+    color: var(--color-fg-default, #1f2328);
+  }
+  .lang-tab-btn.active {
+    color: #6366f1;
+    border-bottom-color: #6366f1;
+  }
+  .lang-tab {
+    display: none;
+  }
+  .lang-tab.active {
+    display: block;
+  }
+  .lang-tab > .highlight:first-child,
+  .lang-tab > pre:first-child {
+    margin-top: 0;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var STORAGE_KEY = 'workshop-lang';
+    var LABELS = { typescript: 'TypeScript', python: 'Python' };
+
+    function getPreferredLang() {
+      return localStorage.getItem(STORAGE_KEY) || 'typescript';
+    }
+
+    function setPreferredLang(lang) {
+      localStorage.setItem(STORAGE_KEY, lang);
+    }
+
+    function activateTab(container, lang) {
+      container.querySelectorAll('.lang-tab-btn').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+      });
+      container.querySelectorAll('.lang-tab').forEach(function (panel) {
+        panel.classList.toggle('active', panel.dataset.lang === lang);
+      });
+    }
+
+    function activateAll(lang) {
+      document.querySelectorAll('.lang-tabs').forEach(function (container) {
+        activateTab(container, lang);
+      });
+      setPreferredLang(lang);
+    }
+
+    document.querySelectorAll('.lang-tabs').forEach(function (container) {
+      var tabs = container.querySelectorAll('.lang-tab');
+      if (tabs.length === 0) return;
+
+      var btnBar = document.createElement('div');
+      btnBar.className = 'lang-tab-buttons';
+
+      tabs.forEach(function (tab) {
+        var lang = tab.dataset.lang;
+        var btn = document.createElement('button');
+        btn.className = 'lang-tab-btn';
+        btn.dataset.lang = lang;
+        btn.textContent = LABELS[lang] || lang;
+        btn.addEventListener('click', function () { activateAll(lang); });
+        btnBar.appendChild(btn);
+      });
+
+      container.insertBefore(btnBar, container.firstChild);
+    });
+
+    activateAll(getPreferredLang());
+  });
+</script>

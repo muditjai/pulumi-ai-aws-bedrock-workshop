@@ -1,3 +1,5 @@
+---
+---
 # Module 3: Multi-agent orchestration
 
 **Duration:** ~40 minutes
@@ -27,7 +29,7 @@ The orchestrator calls the specialist using `bedrock-agentcore:InvokeAgentRuntim
 
 When the orchestrator needs the specialist, it calls `InvokeAgentRuntime` with the specialist's ARN. AgentCore receives the request, verifies the orchestrator's IAM role has permission, and forwards the payload to the specialist container. The specialist processes the request and returns a response, which streams back to the orchestrator.
 
-```
+```text
 User
   ↓  "Analyze the trade-offs of microservices vs monoliths"
 Orchestrator Agent
@@ -44,10 +46,27 @@ The IAM permission that makes this work is `bedrock-agentcore:InvokeAgentRuntime
 
 ## Step 1: Create a new Pulumi project
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 mkdir 03-multi-agent && cd 03-multi-agent
 pulumi new aws-typescript --name multi-agent --yes
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```bash
+mkdir 03-multi-agent && cd 03-multi-agent
+pulumi new aws-python --name multi-agent --yes
+```
+
+</div>
+
+</div>
 
 Add the ESC environment to `Pulumi.dev.yaml`:
 
@@ -58,9 +77,23 @@ environment:
 
 Install dependencies:
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 npm install @pulumi/aws@7.23.0
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+Dependencies are managed in `pyproject.toml` — no install step needed.
+
+</div>
+
+</div>
 
 Set your unique stack name:
 
@@ -121,7 +154,7 @@ The specialist is a plain Strands agent with no special tools. Its only job is t
 
 Create `agent-specialist-code/requirements.txt`:
 
-```
+```text
 strands-agents
 boto3>=1.40.0
 botocore>=1.40.0
@@ -280,17 +313,89 @@ The orchestrator reads `SPECIALIST_ARN` from an environment variable (set by Pul
 
 The response handling has three branches because AgentCore can return different content types: event streams, JSON, or raw bytes. In practice, you'll usually get the streaming format.
 
+## Complete solution files
+
+### Specialist agent
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight python %}
+{% include_relative 03-solution/typescript/agent-specialist-code/agent.py %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 03-solution/python/agent-specialist-code/agent.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
+
+### Orchestrator agent
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight python %}
+{% include_relative 03-solution/typescript/agent-orchestrator-code/agent.py %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 03-solution/python/agent-orchestrator-code/agent.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
+
 Create the same `requirements.txt` and `Dockerfile` as the specialist (see `03-solution/typescript/agent-orchestrator-code/`).
 
 ## Step 4: Write the Pulumi infrastructure
 
 The infrastructure doubles everything from Module 1: two S3 buckets, two ECR repos, two IAM roles, two CodeBuild projects, two Lambda triggers, and two AgentCore Runtimes.
 
-The full `index.ts` is in `03-solution/typescript/index.ts`. Here are the parts that are new.
+The full solution is in `03-solution/typescript/index.ts` (TypeScript) and `03-solution/python/__main__.py` (Python). Here are the parts that are new.
+
+### Infrastructure
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight typescript %}
+{% include_relative 03-solution/typescript/index.ts %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 03-solution/python/__main__.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
 
 ### A2A IAM policy
 
 The orchestrator's execution role gets an extra policy that lets it invoke other agent runtimes:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const orchestratorInvokeSpecialist = new aws.iam.RolePolicy(
@@ -314,11 +419,44 @@ const orchestratorInvokeSpecialist = new aws.iam.RolePolicy(
 );
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+orchestrator_invoke_specialist = aws.iam.RolePolicy(
+    "orchestrator_invoke_specialist",
+    name="OrchestratorInvokeSpecialistPolicy",
+    role=orchestrator_execution.id,
+    policy=pulumi.Output.json_dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Sid": "InvokeSpecialistRuntime",
+            "Effect": "Allow",
+            "Action": ["bedrock-agentcore:InvokeAgentRuntime"],
+            "Resource": pulumi.Output.all(
+                current_region, current_identity
+            ).apply(
+                lambda args: f"arn:aws:bedrock-agentcore:{args[0].name}:{args[1].account_id}:runtime/*"
+            ),
+        }],
+    }),
+)
+```
+
+</div>
+
+</div>
+
 The specialist's role does not get this permission. One-directional only.
 
 ### Sequential builds
 
 The specialist must be built and deployed before the orchestrator, because the orchestrator needs the specialist's ARN as an environment variable:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const triggerBuildOrchestrator = new aws.lambda.Invocation(
@@ -337,9 +475,36 @@ const triggerBuildOrchestrator = new aws.lambda.Invocation(
 );
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+trigger_build_orchestrator = aws.lambda_.Invocation(
+    "trigger_build_orchestrator",
+    function_name=build_trigger_function.name,
+    input=...,  # same pattern
+    triggers={...},
+    opts=pulumi.ResourceOptions(
+        depends_on=[
+            # ... other dependencies ...
+            trigger_build_specialist,  # specialist must build first
+        ]
+    ),
+)
+```
+
+</div>
+
+</div>
+
 ### Passing the specialist ARN
 
 The orchestrator runtime gets the specialist's ARN as an environment variable:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const orchestratorAgent = new aws.bedrock.AgentcoreAgentRuntime("orchestrator", {
@@ -359,6 +524,46 @@ const orchestratorAgent = new aws.bedrock.AgentcoreAgentRuntime("orchestrator", 
   ],
 });
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+orchestrator_agent = aws.bedrock.AgentcoreAgentRuntime(
+    "orchestrator",
+    agent_runtime_name=orchestrator_runtime_name,
+    description=f"Orchestrator agent runtime for {stack_name}",
+    role_arn=orchestrator_execution.arn,
+    agent_runtime_artifact={
+        "container_configuration": {
+            "container_uri": pulumi.Output.concat(
+                orchestrator_ecr.repository_url, ":", image_tag
+            ),
+        }
+    },
+    network_configuration={"network_mode": network_mode},
+    environment_variables={
+        "AWS_REGION": aws_region,
+        "AWS_DEFAULT_REGION": aws_region,
+        "SPECIALIST_ARN": specialist_agent.agent_runtime_arn,
+        "SOURCE_VERSION": orchestrator_source_hash,
+    },
+    opts=pulumi.ResourceOptions(
+        depends_on=[
+            specialist_agent,
+            trigger_build_orchestrator,
+            orchestrator_execution_role_policy,
+            orchestrator_invoke_specialist,
+            orchestrator_execution_managed,
+        ]
+    ),
+)
+```
+
+</div>
+
+</div>
 
 Pulumi resolves `specialistAgent.agentRuntimeArn` automatically once the specialist is created.
 

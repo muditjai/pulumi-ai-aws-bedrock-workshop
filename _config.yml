@@ -17,3 +17,26 @@ include:
   - "03-multi-agent-orchestration.md"
   - "04-full-stack-weather-agent.md"
   - "05-housekeeping.md"
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
+exclude:
+  - _site
+  - .jekyll-cache
+  - .sass-cache
+  - vendor
+  - .git
+  - 01-solution/typescript/node_modules
+  - 02-solution/typescript/node_modules
+  - 03-solution/typescript/node_modules
+  - 04-solution/typescript/node_modules
+  - 01-solution/python/.venv
+  - 02-solution/python/.venv
+  - 03-solution/python/.venv
+  - 04-solution/python/.venv
+  - 01-solution/python/__pycache__
+  - 02-solution/python/__pycache__
+  - 03-solution/python/__pycache__
+  - 04-solution/python/__pycache__

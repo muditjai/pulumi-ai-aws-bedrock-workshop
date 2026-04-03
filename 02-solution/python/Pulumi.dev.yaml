@@ -1,0 +1,4 @@
+environment:
+  - pulumi-idp/auth
+config:
+  mcp-server-agentcore-runtime:stackName: agentcore-mcp-ws

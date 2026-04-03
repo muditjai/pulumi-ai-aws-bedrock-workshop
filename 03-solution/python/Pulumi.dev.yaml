@@ -1,0 +1,4 @@
+environment:
+  - pulumi-idp/auth
+config:
+  multi-agent-runtime:stackName: agentcore-multi-ws

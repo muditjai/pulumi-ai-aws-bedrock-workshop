@@ -1,3 +1,5 @@
+---
+---
 # Module 1: Your first agent on AgentCore
 
 **Duration:** ~30 minutes
@@ -15,7 +17,7 @@ Before you start coding, it helps to understand what actually happens when you r
 
 Here's the pipeline:
 
-```
+```text
 Python agent code
     ↓  (zipped and uploaded)
 S3 bucket
@@ -35,10 +37,27 @@ The agent execution IAM role is the identity your agent runs under. It has a tru
 
 ## Step 1: Create a new Pulumi project
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 mkdir 01-my-first-agent && cd 01-my-first-agent
 pulumi new aws-typescript --name my-first-agent --yes
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```bash
+mkdir 01-my-first-agent && cd 01-my-first-agent
+pulumi new aws-python --name my-first-agent --yes
+```
+
+</div>
+
+</div>
 
 Add the ESC environment for AWS credentials. Open `Pulumi.dev.yaml` and set:
 
@@ -49,9 +68,23 @@ environment:
 
 Install the AWS provider:
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 npm install @pulumi/aws@7.23.0
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+Dependencies are managed in `pyproject.toml` — no install step needed. Pulumi with `uv` handles this automatically.
+
+</div>
+
+</div>
 
 Set your unique stack name (replace `<id>` with the identifier you picked in Module 0):
 
@@ -112,7 +145,7 @@ A few things to notice here. `BedrockAgentCoreApp` wraps your agent as an HTTP s
 
 Create `agent-code/requirements.txt`:
 
-```
+```text
 strands-agents
 boto3
 bedrock-agentcore
@@ -235,9 +268,13 @@ phases:
 
 Now the big part. Open `index.ts` and replace its contents with the infrastructure definition.
 
-The code is long, so we'll go through it section by section. You can also look at the complete file at `01-solution/typescript/index.ts`.
+The code is long, so we'll go through it section by section. You can also look at the complete file at `01-solution/typescript/index.ts` (or `01-solution/python/__main__.py` for the Python version).
 
 First, the configuration and data sources:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 import * as pulumi from "@pulumi/pulumi";
@@ -265,7 +302,45 @@ const currentIdentity = aws.getCallerIdentityOutput({});
 const currentRegion = aws.getRegionOutput({});
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+import pulumi
+import pulumi_aws as aws
+import hashlib
+import json
+import os
+
+config = pulumi.Config()
+agent_name = config.get("agentName") or "BasicAgent"
+network_mode = config.get("networkMode") or "PUBLIC"
+image_tag = config.get("imageTag") or "latest"
+stack_name = config.get("stackName") or "agentcore-basic"
+description = (
+    config.get("description")
+    or "Basic AgentCore runtime with a simple Strands agent"
+)
+environment_variables = config.get_object("environmentVariables") or {}
+ecr_repository_name = config.get("ecrRepositoryName") or "basic-agent"
+
+aws_config = pulumi.Config("aws")
+aws_region = aws_config.require("region")
+
+current_identity = aws.get_caller_identity_output()
+current_region = aws.get_region_output()
+```
+
+</div>
+
+</div>
+
 Next, the S3 bucket for source code. The agent code gets zipped and uploaded here so CodeBuild can read it:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const agentSourceBucket = new aws.s3.Bucket("agent_source", {
@@ -298,7 +373,54 @@ const agentSourceObject = new aws.s3.BucketObjectv2("agent_source", {
 });
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+agent_source_bucket = aws.s3.Bucket(
+    "agent_source",
+    bucket_prefix=f"{stack_name}-source-",
+    force_destroy=True,
+    tags={
+        "Name": f"{stack_name}-agent-source",
+        "Purpose": "Store agent source code for CodeBuild",
+    },
+)
+
+aws.s3.BucketPublicAccessBlock(
+    "agent_source",
+    bucket=agent_source_bucket.id,
+    block_public_acls=True,
+    block_public_policy=True,
+    ignore_public_acls=True,
+    restrict_public_buckets=True,
+)
+
+aws.s3.BucketVersioning(
+    "agent_source",
+    bucket=agent_source_bucket.id,
+    versioning_configuration={"status": "Enabled"},
+)
+
+agent_source_object = aws.s3.BucketObjectv2(
+    "agent_source",
+    bucket=agent_source_bucket.id,
+    key="agent-code.zip",
+    source=pulumi.FileArchive(os.path.join(os.path.dirname(__file__), "agent-code")),
+    tags={"Name": "agent-source-code"},
+)
+```
+
+</div>
+
+</div>
+
 The ECR repository stores the Docker image:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const agentEcr = new aws.ecr.Repository("agent_ecr", {
@@ -310,7 +432,30 @@ const agentEcr = new aws.ecr.Repository("agent_ecr", {
 });
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+agent_ecr = aws.ecr.Repository(
+    "agent_ecr",
+    name=f"{stack_name}-{ecr_repository_name}",
+    image_tag_mutability="MUTABLE",
+    image_scanning_configuration={"scan_on_push": True},
+    force_delete=True,
+    tags={"Name": f"{stack_name}-ecr-repository", "Module": "ECR"},
+)
+```
+
+</div>
+
+</div>
+
 The agent execution role is what your running agent uses to call AWS services. The trust policy only allows AgentCore to assume it:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const agentExecution = new aws.iam.Role("agent_execution", {
@@ -338,9 +483,51 @@ const agentExecution = new aws.iam.Role("agent_execution", {
 });
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+agent_execution = aws.iam.Role(
+    "agent_execution",
+    name=f"{stack_name}-agent-execution-role",
+    assume_role_policy=pulumi.Output.json_dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Sid": "AssumeRolePolicy",
+            "Effect": "Allow",
+            "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "aws:SourceAccount": current_identity.apply(
+                        lambda id: id.account_id
+                    ),
+                },
+                "ArnLike": {
+                    "aws:SourceArn": pulumi.Output.all(
+                        current_region, current_identity
+                    ).apply(
+                        lambda args: f"arn:aws:bedrock-agentcore:{args[0].name}:{args[1].account_id}:*"
+                    ),
+                },
+            },
+        }],
+    }),
+)
+```
+
+</div>
+
+</div>
+
 The role needs policies for ECR, CloudWatch, X-Ray, Bedrock model invocation, and AgentCore workload tokens. See the full `index.ts` in the solution folder for the complete policy statements.
 
 Finally, the AgentCore Runtime itself. This is the actual agent resource:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const basicAgent = new aws.bedrock.AgentcoreAgentRuntime("basic_agent", {
@@ -365,9 +552,88 @@ const basicAgent = new aws.bedrock.AgentcoreAgentRuntime("basic_agent", {
 export const agentRuntimeArn = basicAgent.agentRuntimeArn;
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+basic_agent = aws.bedrock.AgentcoreAgentRuntime(
+    "basic_agent",
+    agent_runtime_name=f"{stack_name}_{agent_name}".replace("-", "_"),
+    description=description,
+    role_arn=agent_execution.arn,
+    agent_runtime_artifact={
+        "container_configuration": {
+            "container_uri": pulumi.Output.concat(
+                agent_ecr.repository_url, ":", image_tag
+            ),
+        }
+    },
+    network_configuration={"network_mode": network_mode},
+    environment_variables={
+        "AWS_REGION": aws_region,
+        "AWS_DEFAULT_REGION": aws_region,
+        **environment_variables,
+    },
+    opts=pulumi.ResourceOptions(
+        depends_on=[trigger_build, agent_execution_role_policy, agent_execution_managed]
+    ),
+)
+
+pulumi.export("agentRuntimeArn", basic_agent.agent_runtime_arn)
+```
+
+</div>
+
+</div>
+
 The `dependsOn` is important. It makes sure the Docker image is built and pushed to ECR before Pulumi tries to create the runtime.
 
-For the complete `index.ts` with all IAM policies, CodeBuild configuration, and the Lambda trigger, copy from `01-solution/typescript/index.ts`.
+## Complete solution files
+
+### Agent implementation
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight python %}
+{% include_relative 01-solution/typescript/agent-code/basic_agent.py %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 01-solution/python/agent-code/basic_agent.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
+
+### Infrastructure
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight typescript %}
+{% include_relative 01-solution/typescript/index.ts %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 01-solution/python/__main__.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
 
 ## Step 6: Deploy
 

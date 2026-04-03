@@ -1,0 +1,4 @@
+environment:
+  - pulumi-idp/auth
+config:
+  end-to-end-weather-agent:stackName: agentcore-weather-ws

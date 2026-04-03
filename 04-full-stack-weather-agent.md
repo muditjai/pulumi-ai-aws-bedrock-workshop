@@ -1,3 +1,5 @@
+---
+---
 # Module 4: The full stack — weather agent with tools and memory
 
 **Duration:** ~40 minutes
@@ -40,10 +42,27 @@ The agent returns immediately with a "processing started" message. The actual wo
 
 ## Step 1: Create a new Pulumi project
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 mkdir 04-weather-agent && cd 04-weather-agent
 pulumi new aws-typescript --name weather-agent --yes
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```bash
+mkdir 04-weather-agent && cd 04-weather-agent
+pulumi new aws-python --name weather-agent --yes
+```
+
+</div>
+
+</div>
 
 Add the ESC environment to `Pulumi.dev.yaml`:
 
@@ -54,9 +73,23 @@ environment:
 
 Install dependencies:
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 npm install @pulumi/aws@7.23.0
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+Dependencies are managed in `pyproject.toml` — no install step needed.
+
+</div>
+
+</div>
 
 Set your unique stack name:
 
@@ -158,11 +191,33 @@ IMPORTANT: Provide complete recommendations and end your response.
 Do NOT ask follow-up questions or wait for additional input."""
 ```
 
-Copy the complete agent code from `04-solution/typescript/agent-code/`.
+## Complete solution files
+
+### Weather agent
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight python %}
+{% include_relative 04-solution/typescript/agent-code/weather_agent.py %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 04-solution/python/agent-code/weather_agent.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
 
 Create `agent-code/requirements.txt`:
 
-```
+```text
 strands-agents
 strands-agents-tools
 uv
@@ -261,9 +316,35 @@ Also create the `lambda/build-trigger/index.py` (same as Module 1).
 
 The infrastructure extends Module 1 with three new AgentCore tool resources, a results S3 bucket, the memory init Lambda, and observability configuration.
 
-The full `index.ts` is in `04-solution/typescript/index.ts`. Here are the new parts.
+The full solution is in `04-solution/typescript/index.ts` (TypeScript) and `04-solution/python/__main__.py` (Python). Here are the new parts.
+
+### Infrastructure
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight typescript %}
+{% include_relative 04-solution/typescript/index.ts %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 04-solution/python/__main__.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
 
 ### AgentCore tools
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const browser = new aws.bedrock.AgentcoreBrowser("browser", {
@@ -285,9 +366,44 @@ const memory = new aws.bedrock.AgentcoreMemory("memory", {
 });
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+browser = aws.bedrock.AgentcoreBrowser(
+    "browser",
+    name=f"{stack_name.replace('-', '_')}_browser",
+    description="Browser tool for weather agent",
+    network_configuration={"network_mode": network_mode},
+)
+
+code_interpreter = aws.bedrock.AgentcoreCodeInterpreter(
+    "code_interpreter",
+    name=f"{stack_name.replace('-', '_')}_code_interpreter",
+    description="Code interpreter for weather data analysis",
+    network_configuration={"network_mode": network_mode},
+)
+
+memory = aws.bedrock.AgentcoreMemory(
+    "memory",
+    name=f"{stack_name.replace('-', '_')}_{memory_name}",
+    description="Memory for weather agent preferences",
+    event_expiry_duration=30,
+)
+```
+
+</div>
+
+</div>
+
 Each tool is a standalone AWS resource. The agent connects to them using their IDs.
 
 ### Passing tool IDs to the agent
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const weatherAgent = new aws.bedrock.AgentcoreAgentRuntime("weather_agent", {
@@ -303,9 +419,36 @@ const weatherAgent = new aws.bedrock.AgentcoreAgentRuntime("weather_agent", {
 });
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+weather_agent = aws.bedrock.AgentcoreAgentRuntime(
+    "weather_agent",
+    # ...
+    environment_variables={
+        "AWS_REGION": aws_region,
+        "AWS_DEFAULT_REGION": aws_region,
+        "RESULTS_BUCKET": results.id,
+        "BROWSER_ID": browser.browser_id,
+        "CODE_INTERPRETER_ID": code_interpreter.code_interpreter_id,
+        "MEMORY_ID": memory.id,
+    },
+)
+```
+
+</div>
+
+</div>
+
 ### Observability
 
 CloudWatch vended logs and X-Ray traces give you visibility into the agent's behavior:
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const agentRuntimeLogs = new aws.cloudwatch.LogGroup("agent_runtime_logs", {
@@ -322,6 +465,33 @@ const logs = new aws.cloudwatch.LogDeliverySource("logs", {
 
 // Similar setup for TRACES → X-Ray
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+agent_runtime_logs = aws.cloudwatch.LogGroup(
+    "agent_runtime_logs",
+    name=pulumi.Output.concat(
+        "/aws/vendedlogs/bedrock-agentcore/", weather_agent.agent_runtime_id
+    ),
+    retention_in_days=14,
+)
+
+logs = aws.cloudwatch.LogDeliverySource(
+    "logs",
+    name=pulumi.Output.concat(weather_agent.agent_runtime_id, "-logs-src"),
+    log_type="APPLICATION_LOGS",
+    resource_arn=weather_agent.agent_runtime_arn,
+)
+
+# Similar setup for TRACES → X-Ray
+```
+
+</div>
+
+</div>
 
 Vended logs are different from regular CloudWatch logs. AgentCore produces them, and you configure a delivery pipeline to route them to a log group. The same pattern works for X-Ray traces.
 
@@ -350,7 +520,7 @@ The test script runs through the full pipeline:
 
 When everything works, you'll see:
 
-```
+```text
 [1/3] Checking runtime status...
       PASS - Runtime is READY
 [2/3] Invoking agent (first call may take 1-2 min for cold start)...

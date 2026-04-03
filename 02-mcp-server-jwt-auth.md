@@ -1,3 +1,5 @@
+---
+---
 # Module 2: Hosting an MCP server with JWT auth
 
 **Duration:** ~45 minutes
@@ -26,10 +28,27 @@ We'll use Amazon Cognito as the identity provider. Cognito issues JWT tokens, an
 
 ## Step 1: Create a new Pulumi project
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 mkdir 02-mcp-server && cd 02-mcp-server
 pulumi new aws-typescript --name mcp-server --yes
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```bash
+mkdir 02-mcp-server && cd 02-mcp-server
+pulumi new aws-python --name mcp-server --yes
+```
+
+</div>
+
+</div>
 
 Add the ESC environment to `Pulumi.dev.yaml`:
 
@@ -40,15 +59,29 @@ environment:
 
 Install dependencies:
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 npm install @pulumi/aws@7.23.0
 ```
 
-Set your unique stack name and a test password (encrypted at rest):
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+Dependencies are managed in `pyproject.toml` — no install step needed.
+
+</div>
+
+</div>
+
+Set your unique stack name and store the test password in the shared ESC environment:
 
 ```bash
 pulumi config set stackName agentcore-mcp-<id>
-pulumi config set --secret testPassword 'TestPassword123'
+pulumi env set pulumi-idp/auth 'pulumiConfig.mcp-server-agentcore-runtime:testPassword' '"'"'"TestPassword123"'"'"' --secret
 ```
 
 ## Step 2: Write the MCP server
@@ -93,7 +126,7 @@ That's the entire MCP server. Three tools, about 20 lines. The `@mcp.tool()` dec
 
 Create `mcp-server-code/requirements.txt`:
 
-```
+```text
 mcp>=1.10.0
 boto3
 bedrock-agentcore
@@ -125,9 +158,59 @@ Notice this Dockerfile is simpler than the agent one. No OpenTelemetry, and it o
 
 The infrastructure is similar to Module 1, with two additions: Cognito for JWT auth and the `protocolConfiguration` on the runtime.
 
-The full `index.ts` is in `02-solution/typescript/index.ts`. Here are the new parts.
+The full solution is in `02-solution/typescript/index.ts` (TypeScript) and `02-solution/python/__main__.py` (Python). Here are the new parts.
+
+## Complete solution files
+
+### MCP server
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight python %}
+{% include_relative 02-solution/typescript/mcp-server-code/mcp_server.py %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 02-solution/python/mcp-server-code/mcp_server.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
+
+### Infrastructure
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
+{% highlight typescript %}
+{% include_relative 02-solution/typescript/index.ts %}
+{% endhighlight %}
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+{% highlight python %}
+{% include_relative 02-solution/python/__main__.py %}
+{% endhighlight %}
+
+</div>
+
+</div>
 
 ### Cognito setup
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const mcpUserPool = new aws.cognito.UserPool("mcp_user_pool", {
@@ -162,9 +245,57 @@ const testUser = new aws.cognito.User("test_user", {
 });
 ```
 
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+mcp_user_pool = aws.cognito.UserPool(
+    "mcp_user_pool",
+    name=f"{stack_name}-user-pool",
+    password_policy={
+        "minimum_length": 8,
+        "require_uppercase": False,
+        "require_lowercase": False,
+        "require_numbers": False,
+        "require_symbols": False,
+    },
+    schemas=[{
+        "name": "email",
+        "attribute_data_type": "String",
+        "required": False,
+        "mutable": True,
+    }],
+)
+
+mcp_client = aws.cognito.UserPoolClient(
+    "mcp_client",
+    name=f"{stack_name}-client",
+    user_pool_id=mcp_user_pool.id,
+    explicit_auth_flows=["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"],
+    generate_secret=False,
+    prevent_user_existence_errors="ENABLED",
+)
+
+test_user = aws.cognito.User(
+    "test_user",
+    user_pool_id=mcp_user_pool.id,
+    username="testuser",
+    message_action="SUPPRESS",
+)
+```
+
+</div>
+
+</div>
+
 A Lambda function sets the test user's password using `AdminSetUserPassword`, since Cognito doesn't let you set a permanent password directly during user creation. The password comes from the Pulumi secret you set earlier.
 
 ### MCP runtime with JWT authorizer
+
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
 
 ```typescript
 const mcpServer = new aws.bedrock.AgentcoreAgentRuntime("mcp_server", {
@@ -192,6 +323,43 @@ const mcpServer = new aws.bedrock.AgentcoreAgentRuntime("mcp_server", {
   environmentVariables: mergedEnvVars,
 });
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```python
+mcp_server = aws.bedrock.AgentcoreAgentRuntime(
+    "mcp_server",
+    agent_runtime_name=runtime_name,
+    description=description,
+    role_arn=agent_execution.arn,
+    agent_runtime_artifact={
+        "container_configuration": {
+            "container_uri": pulumi.Output.concat(
+                server_ecr.repository_url, ":", image_tag
+            ),
+        }
+    },
+    network_configuration={"network_mode": network_mode},
+    protocol_configuration={"server_protocol": "MCP"},
+    authorizer_configuration={
+        "custom_jwt_authorizer": {
+            "allowed_clients": [mcp_client.id],
+            "discovery_url": pulumi.Output.all(
+                current_region, mcp_user_pool.id
+            ).apply(
+                lambda args: f"https://cognito-idp.{args[0].name}.amazonaws.com/{args[1]}/.well-known/openid-configuration"
+            ),
+        }
+    },
+    environment_variables=merged_env_vars,
+)
+```
+
+</div>
+
+</div>
 
 Two things are different from Module 1. `protocolConfiguration.serverProtocol` is set to `"MCP"`, which tells AgentCore this is an MCP server, not a regular agent. And `authorizerConfiguration.customJwtAuthorizer` points to the Cognito OIDC discovery URL and restricts access to our app client ID.
 
@@ -260,7 +428,7 @@ The key idea is default-deny. If no policy explicitly permits a request, it's de
 
 ### How it works
 
-```
+```text
 Agent/User calls tool
     ↓
 AgentCore Gateway receives request

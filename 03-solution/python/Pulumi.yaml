@@ -1,0 +1,6 @@
+name: multi-agent-runtime
+runtime:
+  name: python
+  options:
+    toolchain: uv
+description: Multi-agent runtime with orchestrator and specialist agents - Pulumi Python

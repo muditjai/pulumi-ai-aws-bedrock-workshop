@@ -1,3 +1,5 @@
+---
+---
 # Module 0: Setup and orientation
 
 **Duration:** ~15 minutes
@@ -16,7 +18,7 @@ Before we write any code, here's how the pieces fit together.
 
 **Strands SDK** is a Python framework for writing agents. You define a system prompt, attach tools, and Strands handles the conversation loop with the LLM. It has a built-in `BedrockAgentCoreApp` class that wraps your agent as an HTTP service compatible with AgentCore Runtime.
 
-**Pulumi** is the infrastructure-as-code tool we use to define and deploy everything: S3 buckets, ECR repositories, IAM roles, CodeBuild projects, and the AgentCore runtimes themselves. All in TypeScript.
+**Pulumi** is the infrastructure-as-code tool we use to define and deploy everything: S3 buckets, ECR repositories, IAM roles, CodeBuild projects, and the AgentCore runtimes themselves. You can choose either TypeScript or Python for the infrastructure code.
 
 **Pulumi ESC** (Environments, Secrets, and Configuration) is Pulumi's secrets management layer. Instead of storing AWS access keys in your shell or a `.env` file, ESC uses OIDC federation to get short-lived credentials from AWS on demand. The credentials rotate automatically and never hit disk.
 
@@ -25,7 +27,7 @@ Here's the flow:
 ```
 You write agent code (Python/Strands)
     ↓
-Pulumi deploys infrastructure (TypeScript)
+Pulumi deploys infrastructure (TypeScript or Python)
     ↓
 ESC provides AWS credentials (OIDC)
     ↓
@@ -72,10 +74,27 @@ If you see an error, ask your instructor. The ESC environment may need to be sha
 
 Let's make sure everything works end-to-end. Create a throwaway Pulumi project:
 
+<div class="lang-tabs" markdown="1">
+
+<div class="lang-tab" data-lang="typescript" markdown="1">
+
 ```bash
 mkdir /tmp/verify-setup && cd /tmp/verify-setup
 pulumi new aws-typescript --name verify-setup --yes
 ```
+
+</div>
+
+<div class="lang-tab" data-lang="python" markdown="1">
+
+```bash
+mkdir /tmp/verify-setup && cd /tmp/verify-setup
+pulumi new aws-python --name verify-setup --yes
+```
+
+</div>
+
+</div>
 
 Open `Pulumi.dev.yaml` and add the ESC environment reference:
 
@@ -123,7 +142,7 @@ Keep this identifier consistent across all modules. Write it down.
 
 ## Step 5: Familiarize yourself with the workshop structure
 
-Each module has a markdown file with instructions (what you're reading now) and a solution folder (e.g., `01-solution/typescript/`) with the complete working code if you get stuck.
+Each module has a markdown file with instructions (what you're reading now) and solution folders (e.g., `01-solution/typescript/` and `01-solution/python/`) with the complete working code in both languages if you get stuck.
 
 The modules build on each other. By Module 4, you'll have deployed a multi-tool agent that browses websites, runs Python code, and remembers user preferences.
 

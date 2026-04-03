@@ -1,0 +1,17 @@
+config:
+  # Allow HTML in markdown (needed for lang-tabs divs with markdown="1")
+  MD033: false
+  # Allow duplicate headings in different sections
+  MD024:
+    siblings_only: true
+  # Disable line-length — workshop prose is intentionally free-flowing
+  MD013: false
+  # Allow trailing punctuation in headings (e.g., "Why JWT auth?")
+  MD026:
+    punctuation: ".,;:!。，；：！"
+  # Allow fenced code blocks without language (ASCII art diagrams)
+  MD040: false
+  # Allow lists without surrounding blank lines (common in workshop prose)
+  MD032: false
+  # Disable table column style check (pre-existing formatting)
+  MD060: false

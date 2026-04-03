@@ -8,3 +8,8 @@ _site/
 .DS_Store
 .mcp.json
 .claude
+__pycache__/
+*.pyc
+.venv/
+uv.lock
+Gemfile.lock
