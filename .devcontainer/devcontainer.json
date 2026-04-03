@@ -12,7 +12,7 @@
   },
 
   "postCreateCommand": {
-    "lsp-tools": "npm install -g typescript typescript-language-server pyright",
+    "lsp-tools": "npm install -g prettier typescript typescript-language-server pyright",
     "pip-deps": "pip install boto3 mcp ruff",
     "banner": "echo '[ -f \"${containerWorkspaceFolder}/.devcontainer/banner.sh\" ] && bash \"${containerWorkspaceFolder}/.devcontainer/banner.sh\"' >> ~/.bashrc"
   },
