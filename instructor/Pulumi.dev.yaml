@@ -1,0 +1,3 @@
+environment:
+  - pulumi-idp/auth
+  - workshop-values

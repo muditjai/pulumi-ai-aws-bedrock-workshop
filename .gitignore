@@ -6,3 +6,5 @@ _site/
 .sass-cache/
 *.js.map
 .DS_Store
+.mcp.json
+.claude
