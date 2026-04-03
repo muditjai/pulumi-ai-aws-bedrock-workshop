@@ -13,6 +13,7 @@
 
   "postCreateCommand": {
     "lsp-tools": "npm install -g prettier typescript typescript-language-server pyright",
+    "uv": "curl -LsSf https://astral.sh/uv/install.sh | sh && echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc",
     "pip-deps": "pip install boto3 mcp ruff",
     "banner": "echo '[ -f \"${containerWorkspaceFolder}/.devcontainer/banner.sh\" ] && bash \"${containerWorkspaceFolder}/.devcontainer/banner.sh\"' >> ~/.bashrc"
   },
