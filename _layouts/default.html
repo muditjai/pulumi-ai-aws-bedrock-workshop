@@ -42,9 +42,8 @@
       font-size: 14px;
     }
 
+    /* Code blocks - shared */
     .highlight {
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
       border-radius: 6px;
       margin: 1rem 0;
       position: relative;
@@ -61,9 +60,6 @@
       top: 10px;
       right: 10px;
       z-index: 2;
-      border: 1px solid var(--color-border-default, #d0d7de);
-      background: var(--color-canvas-default, #ffffff);
-      color: var(--color-fg-default, #1f2328);
       border-radius: 6px;
       width: 32px;
       height: 32px;
@@ -75,34 +71,100 @@
       line-height: 1;
       cursor: pointer;
     }
-    .code-copy-btn:hover {
-      background: var(--color-canvas-subtle, #f6f8fa);
+
+    /* Light mode syntax (GitHub style) */
+    [data-color-mode="light"] .highlight,
+    [data-light-theme="light"][data-color-mode="auto"] .highlight {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
     }
-    .code-copy-btn.copied {
-      color: #1a7f37;
-    }
-    .highlight .c, .highlight .c1, .highlight .cm, .highlight .cp, .highlight .cs {
-      color: #6e7781;
-      font-style: italic;
-    }
-    .highlight .k, .highlight .kd, .highlight .kn, .highlight .kp, .highlight .kr, .highlight .kt, .highlight .kv {
-      color: #cf222e;
-    }
-    .highlight .kc, .highlight .mf, .highlight .mh, .highlight .mi, .highlight .mo, .highlight .il {
-      color: #0550ae;
-    }
-    .highlight .s, .highlight .sa, .highlight .sb, .highlight .sc, .highlight .dl, .highlight .sd, .highlight .s1, .highlight .s2, .highlight .se, .highlight .sh, .highlight .si, .highlight .sx, .highlight .sr, .highlight .ss {
-      color: #0a3069;
-    }
-    .highlight .na, .highlight .nb, .highlight .nc, .highlight .nd, .highlight .ne, .highlight .nf, .highlight .nl, .highlight .nn, .highlight .nt, .highlight .nv, .highlight .nx {
-      color: #8250df;
-    }
-    .highlight .o, .highlight .ow, .highlight .p, .highlight .pi {
+    [data-color-mode="light"] .code-copy-btn,
+    [data-light-theme="light"][data-color-mode="auto"] .code-copy-btn {
+      border: 1px solid #d0d7de;
+      background: #ffffff;
       color: #1f2328;
     }
-    .highlight .gh, .highlight .gu {
+    [data-color-mode="light"] .code-copy-btn:hover,
+    [data-light-theme="light"][data-color-mode="auto"] .code-copy-btn:hover {
+      background: #f6f8fa;
+    }
+    [data-color-mode="light"] .code-copy-btn.copied,
+    [data-light-theme="light"][data-color-mode="auto"] .code-copy-btn.copied {
+      color: #1a7f37;
+    }
+    [data-color-mode="light"] .highlight .c, [data-color-mode="light"] .highlight .c1, [data-color-mode="light"] .highlight .cm, [data-color-mode="light"] .highlight .cp, [data-color-mode="light"] .highlight .cs {
+      color: #6e7781; font-style: italic;
+    }
+    [data-color-mode="light"] .highlight .k, [data-color-mode="light"] .highlight .kd, [data-color-mode="light"] .highlight .kn, [data-color-mode="light"] .highlight .kp, [data-color-mode="light"] .highlight .kr, [data-color-mode="light"] .highlight .kt, [data-color-mode="light"] .highlight .kv {
+      color: #cf222e;
+    }
+    [data-color-mode="light"] .highlight .kc, [data-color-mode="light"] .highlight .mf, [data-color-mode="light"] .highlight .mh, [data-color-mode="light"] .highlight .mi, [data-color-mode="light"] .highlight .mo, [data-color-mode="light"] .highlight .il {
       color: #0550ae;
-      font-weight: 600;
+    }
+    [data-color-mode="light"] .highlight .s, [data-color-mode="light"] .highlight .sa, [data-color-mode="light"] .highlight .sb, [data-color-mode="light"] .highlight .sc, [data-color-mode="light"] .highlight .dl, [data-color-mode="light"] .highlight .sd, [data-color-mode="light"] .highlight .s1, [data-color-mode="light"] .highlight .s2, [data-color-mode="light"] .highlight .se, [data-color-mode="light"] .highlight .sh, [data-color-mode="light"] .highlight .si, [data-color-mode="light"] .highlight .sx, [data-color-mode="light"] .highlight .sr, [data-color-mode="light"] .highlight .ss {
+      color: #0a3069;
+    }
+    [data-color-mode="light"] .highlight .na, [data-color-mode="light"] .highlight .nb, [data-color-mode="light"] .highlight .nc, [data-color-mode="light"] .highlight .nd, [data-color-mode="light"] .highlight .ne, [data-color-mode="light"] .highlight .nf, [data-color-mode="light"] .highlight .nl, [data-color-mode="light"] .highlight .nn, [data-color-mode="light"] .highlight .nt, [data-color-mode="light"] .highlight .nv, [data-color-mode="light"] .highlight .nx {
+      color: #8250df;
+    }
+    [data-color-mode="light"] .highlight .o, [data-color-mode="light"] .highlight .ow, [data-color-mode="light"] .highlight .p, [data-color-mode="light"] .highlight .pi {
+      color: #1f2328;
+    }
+    [data-color-mode="light"] .highlight .gh, [data-color-mode="light"] .highlight .gu {
+      color: #0550ae; font-weight: 600;
+    }
+
+    /* Dark mode syntax (Dracula) */
+    [data-color-mode="dark"] .highlight,
+    [data-dark-theme="dark"][data-color-mode="auto"] .highlight {
+      background: #282a36;
+      border: 1px solid #44475a;
+    }
+    [data-color-mode="dark"] .highlight pre,
+    [data-dark-theme="dark"][data-color-mode="auto"] .highlight pre {
+      color: #f8f8f2;
+    }
+    [data-color-mode="dark"] .code-copy-btn,
+    [data-dark-theme="dark"][data-color-mode="auto"] .code-copy-btn {
+      border: 1px solid #44475a;
+      background: #282a36;
+      color: #f8f8f2;
+    }
+    [data-color-mode="dark"] .code-copy-btn:hover,
+    [data-dark-theme="dark"][data-color-mode="auto"] .code-copy-btn:hover {
+      background: #44475a;
+    }
+    [data-color-mode="dark"] .code-copy-btn.copied,
+    [data-dark-theme="dark"][data-color-mode="auto"] .code-copy-btn.copied {
+      color: #50fa7b;
+    }
+    /* Dracula: comments */
+    [data-color-mode="dark"] .highlight .c, [data-color-mode="dark"] .highlight .c1, [data-color-mode="dark"] .highlight .cm, [data-color-mode="dark"] .highlight .cp, [data-color-mode="dark"] .highlight .cs {
+      color: #6272a4; font-style: italic;
+    }
+    /* Dracula: keywords */
+    [data-color-mode="dark"] .highlight .k, [data-color-mode="dark"] .highlight .kd, [data-color-mode="dark"] .highlight .kn, [data-color-mode="dark"] .highlight .kp, [data-color-mode="dark"] .highlight .kr, [data-color-mode="dark"] .highlight .kt, [data-color-mode="dark"] .highlight .kv {
+      color: #ff79c6;
+    }
+    /* Dracula: constants, numbers */
+    [data-color-mode="dark"] .highlight .kc, [data-color-mode="dark"] .highlight .mf, [data-color-mode="dark"] .highlight .mh, [data-color-mode="dark"] .highlight .mi, [data-color-mode="dark"] .highlight .mo, [data-color-mode="dark"] .highlight .il {
+      color: #bd93f9;
+    }
+    /* Dracula: strings */
+    [data-color-mode="dark"] .highlight .s, [data-color-mode="dark"] .highlight .sa, [data-color-mode="dark"] .highlight .sb, [data-color-mode="dark"] .highlight .sc, [data-color-mode="dark"] .highlight .dl, [data-color-mode="dark"] .highlight .sd, [data-color-mode="dark"] .highlight .s1, [data-color-mode="dark"] .highlight .s2, [data-color-mode="dark"] .highlight .se, [data-color-mode="dark"] .highlight .sh, [data-color-mode="dark"] .highlight .si, [data-color-mode="dark"] .highlight .sx, [data-color-mode="dark"] .highlight .sr, [data-color-mode="dark"] .highlight .ss {
+      color: #f1fa8c;
+    }
+    /* Dracula: names, functions, classes */
+    [data-color-mode="dark"] .highlight .na, [data-color-mode="dark"] .highlight .nb, [data-color-mode="dark"] .highlight .nc, [data-color-mode="dark"] .highlight .nd, [data-color-mode="dark"] .highlight .ne, [data-color-mode="dark"] .highlight .nf, [data-color-mode="dark"] .highlight .nl, [data-color-mode="dark"] .highlight .nn, [data-color-mode="dark"] .highlight .nt, [data-color-mode="dark"] .highlight .nv, [data-color-mode="dark"] .highlight .nx {
+      color: #50fa7b;
+    }
+    /* Dracula: operators, punctuation */
+    [data-color-mode="dark"] .highlight .o, [data-color-mode="dark"] .highlight .ow, [data-color-mode="dark"] .highlight .p, [data-color-mode="dark"] .highlight .pi {
+      color: #f8f8f2;
+    }
+    /* Dracula: headings */
+    [data-color-mode="dark"] .highlight .gh, [data-color-mode="dark"] .highlight .gu {
+      color: #8be9fd; font-weight: 600;
     }
   </style>
 </head>
