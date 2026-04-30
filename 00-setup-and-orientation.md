@@ -38,7 +38,32 @@ AgentCore Runtime runs your agent
 
 ## Step 1: Log into Pulumi Cloud
 
-If you haven't already, create a free Pulumi account and log in:
+If you haven't already, create a free Pulumi account. 
+
+### Codespaces Users and Optionally Local Terminal Users
+
+Go to the Pulumi Cloud UI and click on your user account in the upper righthand side of the screen.
+
+Select `Personal access tokens` and create an access token.
+
+Then log in from the terminal:
+
+```bash
+export PULUMI_ACCESS_TOKEN=pul-xxxxxx
+pulumi login
+```
+
+Verify it worked:
+
+```bash
+pulumi whoami
+```
+
+You should see your username.
+
+### Local Terminal Users
+
+Log in from the terminal:
 
 ```bash
 pulumi login
