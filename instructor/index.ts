@@ -7,37 +7,45 @@ import * as aws from "@pulumi/aws";
 
 const config = new pulumi.Config();
 const workshopTitle = config.get("workshopTitle") || "Workshop Credentials";
-const values = config.requireObject<Record<string, string>>("values");
+// Extra display values merged onto the credential page (optional – IAM creds are always added automatically)
+const extraValues = config.getObject<Record<string, string>>("values") ?? {};
+// Bump this value (e.g. "2", "3") to rotate the workshop participant's access key on the next `pulumi up`
+const keyVersion = config.get("keyVersion") ?? "1";
 
 // ============================================================================
 // Generate HTML
 // ============================================================================
 
+function buildEscYaml(kvPairs: Record<string, string>): string {
+  const lines: string[] = ["values:", "  secrets:"];
+  for (const [k, v] of Object.entries(kvPairs)) {
+    lines.push(`    ${k}:`);
+    lines.push(`      fn::secret: ${v}`);
+  }
+  lines.push("  environmentVariables:");
+  for (const k of Object.keys(kvPairs)) {
+    lines.push(`    ${k}: \${secrets.${k}}`);
+  }
+  lines.push("  pulumiConfig:");
+  lines.push("    aws:region: us-east-1");
+  return lines.join("\n");
+}
+
 function generateHtml(
   title: string,
   kvPairs: Record<string, string>,
 ): string {
-  const cards = Object.entries(kvPairs)
-    .map(
-      ([key, value], i) => `
-      <div class="card" data-value="${value.replace(/"/g, "&quot;")}" onclick="copyCard(this)" style="animation-delay: ${0.1 + i * 0.08}s">
-        <div class="card-inner">
-          <div class="card-left">
-            <span class="card-key">${key}</span>
-            <code class="card-val">${value}</code>
-          </div>
-          <div class="card-action">
-            <span class="action-label">COPY</span>
-            <span class="action-done">COPIED</span>
-          </div>
-        </div>
-        <div class="card-flash"></div>
-      </div>`,
-    )
-    .join("\n");
+  const escYaml = buildEscYaml(kvPairs);
+  const yamlHtml = escYaml
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
   const count = Object.keys(kvPairs).length;
   const now = new Date().toISOString().split("T")[0];
+  const h1 = title
+    .replace("Pulumi", '<span class="hl">Pulumi</span>')
+    .replace("AgentCore", '<span class="hl">AgentCore</span>');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -50,341 +58,119 @@ function generateHtml(
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #08080c;
-      --surface: rgba(255,255,255,0.03);
-      --surface-hover: rgba(255,255,255,0.06);
+      --bg: #08080c; --surface: rgba(255,255,255,0.03);
       --border: rgba(255,255,255,0.07);
-      --amber: #f0a830;
-      --amber-dim: #c78520;
-      --amber-glow: rgba(240,168,48,0.08);
-      --amber-flash: rgba(240,168,48,0.15);
-      --green: #34d399;
-      --text: #d4d4d8;
-      --text-dim: #63636e;
+      --amber: #f0a830; --amber-dim: #c78520; --amber-glow: rgba(240,168,48,0.08);
+      --green: #34d399; --text: #d4d4d8; --text-dim: #63636e;
       --font-display: 'Outfit', system-ui, sans-serif;
       --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
     }
-
     html { font-size: 16px; }
-
     body {
-      font-family: var(--font-display);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
+      font-family: var(--font-display); background: var(--bg); color: var(--text);
+      min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased;
     }
-
-    /* Scanline overlay */
     body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.08) 2px,
-        rgba(0,0,0,0.08) 4px
-      );
-      pointer-events: none;
-      z-index: 1000;
+      content: ''; position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+      pointer-events: none; z-index: 1000;
     }
-
-    /* Ambient glow */
     .glow {
-      position: fixed;
-      width: 600px;
-      height: 600px;
-      border-radius: 50%;
+      position: fixed; width: 600px; height: 600px; border-radius: 50%;
       background: radial-gradient(circle, var(--amber-glow) 0%, transparent 70%);
-      top: -200px;
-      left: 50%;
-      transform: translateX(-50%);
-      pointer-events: none;
-      z-index: 0;
+      top: -200px; left: 50%; transform: translateX(-50%);
+      pointer-events: none; z-index: 0;
     }
-
-    .container {
-      position: relative;
-      z-index: 1;
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 72px 24px 80px;
-    }
-
-    @media (max-width: 640px) {
-      .container { padding: 40px 16px 48px; }
-    }
-
-    /* Header */
-    .header { margin-bottom: 48px; }
-
+    .container { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 72px 24px 80px; }
+    @media (max-width: 640px) { .container { padding: 40px 16px 48px; } }
+    .header { margin-bottom: 40px; }
     .header-meta {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--text-dim);
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--text-dim);
     }
-
-    .header-meta .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-      animation: pulse 2s ease-in-out infinite;
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    h1 { font-size: clamp(1.6rem, 4.5vw, 2.2rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: #fff; margin-bottom: 12px; }
+    .hl { color: var(--amber); }
+    .subtitle { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .subtitle a { color: var(--amber-dim); text-decoration: none; }
+    .subtitle a:hover { text-decoration: underline; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 32px 0; }
+    .yaml-wrapper { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .yaml-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
     }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+    .yaml-lang { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+    .copy-btn {
+      font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+      background: none; border: 1px solid var(--border); border-radius: 4px;
+      padding: 4px 12px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
     }
-
-    h1 {
-      font-family: var(--font-display);
-      font-size: clamp(1.6rem, 4.5vw, 2.2rem);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      color: #fff;
-      margin-bottom: 14px;
+    .copy-btn:hover { color: var(--amber); border-color: rgba(240,168,48,0.4); }
+    .copy-btn .done { display: none; color: var(--green); }
+    .copy-btn.copied .label { display: none; }
+    .copy-btn.copied .done { display: inline; }
+    pre.yaml-pre {
+      padding: 20px 24px; overflow-x: auto;
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.75;
+      color: var(--text); white-space: pre; tab-size: 2; background: none;
     }
-
-    h1 .highlight {
-      color: var(--amber);
-    }
-
-    .subtitle {
-      font-family: var(--font-mono);
-      font-size: 13px;
-      color: var(--text-dim);
-      line-height: 1.6;
-    }
-
-    .subtitle kbd {
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 4px;
-      padding: 1px 6px;
-      vertical-align: 1px;
-    }
-
-    /* Divider */
-    .divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--border), transparent);
-      margin: 32px 0;
-    }
-
-    /* Cards */
-    .cards {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .card {
-      position: relative;
-      overflow: hidden;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      cursor: pointer;
-      user-select: none;
-      transition: border-color 0.2s, background 0.2s, transform 0.15s;
-      animation: slideIn 0.4s ease-out both;
-    }
-
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .card:hover {
-      border-color: rgba(240,168,48,0.25);
-      background: var(--surface-hover);
-    }
-
-    .card:active {
-      transform: scale(0.995);
-    }
-
-    .card-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 20px;
-      gap: 16px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .card-left {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .card-key {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--amber-dim);
-      margin-bottom: 6px;
-    }
-
-    .card-val {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 13.5px;
-      font-weight: 400;
-      color: var(--text);
-      word-break: break-all;
-      line-height: 1.5;
-      background: none;
-    }
-
-    .card-action {
-      flex-shrink: 0;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      transition: color 0.15s;
-    }
-
-    .card:hover .card-action { color: var(--amber); }
-
-    .card-action .action-done {
-      display: none;
-      color: var(--green);
-    }
-
-    .card.copied .action-label { display: none; }
-    .card.copied .action-done { display: inline; }
-
-    /* Flash effect on copy */
-    .card-flash {
-      position: absolute;
-      inset: 0;
-      background: var(--amber-flash);
-      opacity: 0;
-      z-index: 1;
-      pointer-events: none;
-      transition: opacity 0.4s;
-    }
-
-    .card.flash .card-flash {
-      opacity: 1;
-      transition: opacity 0s;
-    }
-
-    /* Toast */
     .toast {
-      position: fixed;
-      bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%) translateY(16px);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      color: var(--green);
-      background: rgba(8,8,12,0.95);
-      border: 1px solid rgba(52,211,153,0.2);
-      border-radius: 6px;
-      padding: 10px 20px;
-      opacity: 0;
-      transition: opacity 0.25s, transform 0.25s;
-      pointer-events: none;
-      z-index: 999;
-      backdrop-filter: blur(12px);
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(16px);
+      font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+      color: var(--green); background: rgba(8,8,12,0.95);
+      border: 1px solid rgba(52,211,153,0.2); border-radius: 6px; padding: 10px 20px;
+      opacity: 0; transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none; z-index: 999; backdrop-filter: blur(12px);
     }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    /* Footer */
-    .footer {
-      margin-top: 48px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-dim);
-      text-align: center;
-      letter-spacing: 0.02em;
-    }
-
-    .footer a {
-      color: var(--amber-dim);
-      text-decoration: none;
-    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .footer { margin-top: 48px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-align: center; letter-spacing: 0.02em; }
+    .footer a { color: var(--amber-dim); text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="glow"></div>
-
   <div class="container">
     <header class="header">
       <div class="header-meta">
         <span class="dot"></span>
-        <span>live &middot; ${count} values &middot; ${now}</span>
+        <span>live &middot; ${count} credential${count === 1 ? "" : "s"} &middot; ${now}</span>
       </div>
-      <h1>${title.replace("Pulumi", '<span class="highlight">Pulumi</span>').replace("AgentCore", '<span class="highlight">AgentCore</span>')}</h1>
-      <p class="subtitle">Click any row to copy its value. Works on mobile too.</p>
+      <h1>${h1}</h1>
+      <p class="subtitle">Paste this YAML into your <a href="https://www.pulumi.com/product/esc/" target="_blank">Pulumi ESC</a> environment, then run <code style="font-family:var(--font-mono)">pulumi env open</code> to verify.</p>
     </header>
-
     <div class="divider"></div>
-
-    <div class="cards">
-      ${cards}
+    <div class="yaml-wrapper">
+      <div class="yaml-toolbar">
+        <span class="yaml-lang">ESC YAML</span>
+        <button class="copy-btn" id="copyBtn" onclick="copyYaml()">
+          <span class="label">COPY</span>
+          <span class="done">COPIED</span>
+        </button>
+      </div>
+      <pre class="yaml-pre" id="yamlPre">${yamlHtml}</pre>
     </div>
-
     <div class="divider"></div>
-
     <footer class="footer">
       Served from <a href="https://www.pulumi.com/product/esc/" target="_blank">Pulumi ESC</a> &middot; Deployed with <a href="https://www.pulumi.com" target="_blank">Pulumi</a>
     </footer>
   </div>
-
-  <div class="toast" id="toast"></div>
-
+  <div class="toast" id="toast">YAML copied to clipboard</div>
   <script>
-    function copyCard(card) {
-      const value = card.dataset.value;
-      navigator.clipboard.writeText(value).then(() => {
-        // Flash
-        card.classList.add('flash', 'copied');
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => card.classList.remove('flash'));
-        });
-
-        // Toast
-        const label = card.querySelector('.card-key').textContent;
-        const toast = document.getElementById('toast');
-        toast.textContent = label + ' copied to clipboard';
-        toast.classList.add('show');
-
+    function copyYaml() {
+      navigator.clipboard.writeText(document.getElementById('yamlPre').innerText).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.classList.add('copied');
+        document.getElementById('toast').classList.add('show');
         setTimeout(() => {
-          card.classList.remove('copied');
-          toast.classList.remove('show');
+          btn.classList.remove('copied');
+          document.getElementById('toast').classList.remove('show');
         }, 2000);
       });
     }
@@ -412,10 +198,294 @@ new aws.s3.BucketPublicAccessBlock("site", {
 });
 
 // ============================================================================
+// Workshop Participant IAM User
+// ============================================================================
+
+const workshopParticipant = new aws.iam.User("workshop_participant", {
+  forceDestroy: true,
+  tags: {
+    Purpose: "AWS Bedrock AgentCore Workshop",
+  },
+});
+
+// ============================================================================
+// Workshop Participant IAM Policy
+// ============================================================================
+
+const workshopPolicy = new aws.iam.Policy("workshop_policy", {
+  name: "WorkshopParticipantPolicy",
+  description:
+    "Permissions for workshop participants to deploy solutions 01-04",
+  policy: JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Sid: "STSAccess",
+        Effect: "Allow",
+        Action: ["sts:GetCallerIdentity"],
+        Resource: "*",
+      },
+      {
+        Sid: "S3Access",
+        Effect: "Allow",
+        Action: [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:ListBucket",
+          "s3:ListAllMyBuckets",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketTagging",
+          "s3:GetBucketAcl",
+          "s3:PutBucketVersioning",
+          "s3:PutBucketPolicy",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:PutBucketTagging",
+          "s3:PutBucketAcl",
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetObjectTagging",
+          "s3:PutObjectTagging",
+          "s3:GetObjectVersion",
+          "s3:DeleteObjectVersion",
+        ],
+        Resource: "*",
+      },
+      {
+        Sid: "ECRAccess",
+        Effect: "Allow",
+        Action: [
+          "ecr:CreateRepository",
+          "ecr:DeleteRepository",
+          "ecr:DescribeRepositories",
+          "ecr:ListRepositories",
+          "ecr:GetRepositoryPolicy",
+          "ecr:SetRepositoryPolicy",
+          "ecr:DeleteRepositoryPolicy",
+          "ecr:GetLifecyclePolicy",
+          "ecr:PutLifecyclePolicy",
+          "ecr:DeleteLifecyclePolicy",
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:ListImages",
+          "ecr:DescribeImages",
+          "ecr:TagResource",
+          "ecr:UntagResource",
+          "ecr:PutImageTagMutability",
+          "ecr:PutImageScanningConfiguration",
+        ],
+        Resource: "*",
+      },
+      {
+        Sid: "CodeBuildAccess",
+        Effect: "Allow",
+        Action: [
+          "codebuild:CreateProject",
+          "codebuild:DeleteProject",
+          "codebuild:UpdateProject",
+          "codebuild:BatchGetProjects",
+          "codebuild:ListProjects",
+          "codebuild:StartBuild",
+          "codebuild:StopBuild",
+          "codebuild:BatchGetBuilds",
+          "codebuild:ListBuildsForProject",
+          "codebuild:ListBuilds",
+        ],
+        Resource: "*",
+      },
+      {
+        Sid: "LambdaAccess",
+        Effect: "Allow",
+        Action: [
+          "lambda:CreateFunction",
+          "lambda:DeleteFunction",
+          "lambda:GetFunction",
+          "lambda:GetFunctionConfiguration",
+          "lambda:UpdateFunctionCode",
+          "lambda:UpdateFunctionConfiguration",
+          "lambda:InvokeFunction",
+          "lambda:AddPermission",
+          "lambda:RemovePermission",
+          "lambda:GetPolicy",
+          "lambda:ListFunctions",
+          "lambda:TagResource",
+          "lambda:UntagResource",
+          "lambda:ListTags",
+        ],
+        Resource: "*",
+      },
+      {
+        // Needed to create and manage service roles used by Lambda, CodeBuild, and AgentCore
+        Sid: "IAMManagement",
+        Effect: "Allow",
+        Action: [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:GetRole",
+          "iam:ListRoles",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:ListAttachedRolePolicies",
+          "iam:PassRole",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListPolicies",
+          "iam:ListPolicyVersions",
+          "iam:CreateServiceLinkedRole",
+        ],
+        Resource: "*",
+      },
+      {
+        Sid: "CloudWatchLogsAccess",
+        Effect: "Allow",
+        Action: [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:CreateLogStream",
+          "logs:DeleteLogStream",
+          "logs:PutLogEvents",
+          "logs:GetLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy",
+          "logs:TagLogGroup",
+          "logs:UntagLogGroup",
+          "logs:TagResource",
+          "logs:UntagResource",
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource",
+          // Used by solution 04 for AgentCore trace/log delivery
+          "logs:DescribeDeliveries",
+          "logs:CreateDelivery",
+          "logs:DeleteDelivery",
+          "logs:GetDelivery",
+          "logs:UpdateDelivery",
+          "logs:DescribeDeliveryDestinations",
+          "logs:CreateDeliveryDestination",
+          "logs:DeleteDeliveryDestination",
+          "logs:GetDeliveryDestination",
+          "logs:PutDeliveryDestinationPolicy",
+          "logs:GetDeliveryDestinationPolicy",
+          "logs:DeleteDeliveryDestinationPolicy",
+          "logs:DescribeDeliverySources",
+          "logs:CreateDeliverySource",
+          "logs:DeleteDeliverySource",
+          "logs:GetDeliverySource",
+        ],
+        Resource: "*",
+      },
+      {
+        Sid: "CloudWatchMetricsAccess",
+        Effect: "Allow",
+        Action: [
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:DescribeAlarms",
+        ],
+        Resource: "*",
+      },
+      {
+        Sid: "XRayAccess",
+        Effect: "Allow",
+        Action: [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+        ],
+        Resource: "*",
+      },
+      {
+        // Covers Runtime, Gateway, Browser, Code Interpreter, Memory (all solutions)
+        Sid: "BedrockAgentCoreAccess",
+        Effect: "Allow",
+        Action: ["bedrock-agentcore:*"],
+        Resource: "*",
+      },
+      {
+        Sid: "BedrockModelAccess",
+        Effect: "Allow",
+        Action: [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock:ListFoundationModels",
+          "bedrock:GetFoundationModel",
+        ],
+        Resource: "*",
+      },
+      {
+        // Used by solution 02 for JWT authentication on the MCP Gateway
+        Sid: "CognitoAccess",
+        Effect: "Allow",
+        Action: [
+          "cognito-idp:CreateUserPool",
+          "cognito-idp:DeleteUserPool",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:UpdateUserPool",
+          "cognito-idp:ListUserPools",
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:DeleteUserPoolClient",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:UpdateUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:TagResource",
+          "cognito-idp:UntagResource",
+        ],
+        Resource: "*",
+      },
+    ],
+  }),
+});
+
+new aws.iam.UserPolicyAttachment("workshop_policy", {
+  user: workshopParticipant.name,
+  policyArn: workshopPolicy.arn,
+});
+
+// ============================================================================
+// Workshop Participant IAM Access Key
+// ============================================================================
+
+const workshopAccessKey = new aws.iam.AccessKey(`workshop_participant_v${keyVersion}`, {
+  user: workshopParticipant.name,
+});
+
+// ============================================================================
 // Generate and upload HTML
 // ============================================================================
 
-const htmlContent = generateHtml(workshopTitle, values);
+// IAM credentials are always first; extraValues from config are merged in after
+const allValues = pulumi
+  .all([workshopAccessKey.id, workshopAccessKey.secret])
+  .apply(([accessKeyId, secretAccessKey]: [string, string]) => ({
+    AWS_ACCESS_KEY_ID: accessKeyId,
+    AWS_SECRET_ACCESS_KEY: secretAccessKey,
+    ...extraValues,
+  }));
+
+const htmlContent = allValues.apply((vals: Record<string, string>) =>
+  generateHtml(workshopTitle, vals),
+);
 
 const indexHtml = new aws.s3.BucketObjectv2("index", {
   bucket: siteBucket.id,
@@ -508,3 +578,4 @@ new aws.s3.BucketPolicy("site", {
 export const siteUrl = pulumi.interpolate`https://${distribution.domainName}`;
 export const distributionId = distribution.id;
 export const bucketName = siteBucket.id;
+export const workshopIamUser = workshopParticipant.name;

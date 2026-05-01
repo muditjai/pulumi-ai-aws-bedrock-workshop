@@ -1,3 +1,2 @@
 environment:
-  - pulumi-idp/auth
-  - workshop-values
+  - aicamp/workshop-aws-oidc
