@@ -40,6 +40,8 @@ We recommend using GitHub Codespaces with the included devcontainer for a zero-i
 
 Modules 2 and 4 are **stretch goals** for participants who finish the core path (Modules 0, 1, 3, 5) early. Each is its own Pulumi stack, so skipping them doesn't break anything later.
 
+New to the terminology? The [Glossary](glossary.md) lists every acronym used in the workshop.
+
 ## Getting started
 
 ### Option A: GitHub Codespaces (recommended)
@@ -77,6 +79,7 @@ Modules 2 and 4 are **stretch goals** for participants who finish the core path 
 ├── 03-multi-agent-orchestration.md # Module 3: A2A communication
 ├── 04-full-stack-weather-agent.md  # Module 4: Full stack agent
 ├── 05-housekeeping.md              # Module 5: Cleanup
+├── glossary.md                     # Acronyms used across the workshop
 ├── 01-solution/typescript/         # Module 1 solution code
 ├── 02-solution/typescript/         # Module 2 solution code
 ├── 03-solution/typescript/         # Module 3 solution code
