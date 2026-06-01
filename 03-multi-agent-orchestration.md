@@ -81,6 +81,13 @@ flowchart LR
 
 ## Step 1: Create a new Pulumi project
 
+If you're still inside the previous module's folder, hop back to the workshop root
+first (`cd -` returns to wherever you were before; adjust if needed):
+
+```bash
+cd -
+```
+
 <div class="lang-tabs" markdown="1">
 
 <div class="lang-tab" data-lang="typescript" markdown="1">
@@ -103,11 +110,13 @@ pulumi new aws-python --name multi-agent --yes
 
 </div>
 
-Add the ESC environment to `Pulumi.dev.yaml`:
+Add the ESC environment reference to `Pulumi.dev.yaml`:
 
-```yaml
+```bash
+cat >> Pulumi.dev.yaml <<'EOF'
 environment:
   - aws-bedrock-workshop/dev
+EOF
 ```
 
 The `pulumi new` template already includes the AWS provider. Pin it to the version this workshop uses:
@@ -124,31 +133,40 @@ npm install @pulumi/aws@7.23.0
 
 <div class="lang-tab" data-lang="python" markdown="1">
 
+The `pulumi new` template writes a `requirements.txt`. Replace it with the pinned
+dependencies, then install:
+
 ```bash
-uv add pulumi-aws>=7.23.0
+cat > requirements.txt <<'EOF'
+pulumi>=3.0.0,<4.0.0
+pulumi-aws>=7.23.0
+EOF
+pulumi install
 ```
 
 </div>
 
 </div>
 
-Set your unique stack name:
+Set your unique stack name (replace `<id>` with the identifier you picked in Module 0):
 
 ```bash
 pulumi config set stackName agentcore-multi-<id>
 ```
 
+> Forgot your `<id>`? It's the 2-5 character identifier from [Module 0, Step 4](00-setup-and-orientation.md#step-4-pick-your-unique-identifier). Use the same one in every module so your resources don't collide with other participants'.
+
 ## Step 2: Write the specialist agent
 
 The specialist is a plain Strands agent with no special tools. Its only job is to give detailed answers. The response includes `"agent": "specialist"` so you can tell where the answer came from when testing.
 
-Create the specialist source directory:
+Create a folder for the specialist's source:
 
 ```bash
 mkdir -p agent-specialist-code
 ```
 
-Create `agent-specialist-code/agent.py`:
+Create `agent.py` inside `agent-specialist-code` and copy the content in:
 
 ```python
 from strands import Agent
@@ -192,7 +210,7 @@ if __name__ == "__main__":
     app.run()
 ```
 
-Create `agent-specialist-code/requirements.txt`:
+Create `requirements.txt` inside `agent-specialist-code`:
 
 ```text
 strands-agents
@@ -201,7 +219,7 @@ botocore>=1.40.0
 bedrock-agentcore
 ```
 
-Create `agent-specialist-code/Dockerfile`:
+Create `Dockerfile` inside `agent-specialist-code`:
 
 ```dockerfile
 FROM public.ecr.aws/docker/library/python:3.11-slim
@@ -228,13 +246,16 @@ The orchestrator reads `SPECIALIST_ARN` from an environment variable set by Pulu
 
 The response handling has three branches because AgentCore can return different content types: event streams, JSON, or raw bytes. In practice, you'll usually get the streaming format.
 
-Create the orchestrator source directory:
+Create a folder for the orchestrator's source. If you stepped into
+`agent-specialist-code` in your terminal, go back to the module root first so this
+lands in the right place:
 
 ```bash
+cd ..   # only if you're inside agent-specialist-code; skip if already in the module root
 mkdir -p agent-orchestrator-code
 ```
 
-Create `agent-orchestrator-code/agent.py`:
+Create `agent.py` inside `agent-orchestrator-code` and copy the content in:
 
 ```python
 from strands import Agent, tool
@@ -381,7 +402,9 @@ The orchestrator uses the same `requirements.txt` and `Dockerfile` as the specia
 
 ## Step 4: Create the buildspecs
 
-Each agent has its own CodeBuild buildspec. Both follow the same pattern: authenticate to ECR, build the Docker image for ARM64, and push it. Create `buildspec-specialist.yml`:
+Each agent has its own CodeBuild buildspec. Both follow the same pattern: authenticate to ECR, build the Docker image for ARM64, and push it. Both files live in the **module root** (next to the two `agent-*-code` folders), where the Pulumi program reads them.
+
+Create `buildspec-specialist.yml` in the module root:
 
 ```yaml
 version: 0.2
@@ -409,7 +432,7 @@ phases:
       - echo Specialist Agent ARM64 Docker image pushed successfully
 ```
 
-Create `buildspec-orchestrator.yml`:
+Create `buildspec-orchestrator.yml`, also in the module root:
 
 ```yaml
 version: 0.2
@@ -439,18 +462,72 @@ phases:
 
 ## Step 5: Create the build trigger Lambda
 
-Copy the build trigger Lambda from Module 1. The function is reused here without modification - create the directory and copy the code:
+Module 2 shipped a ZIP straight to AgentCore. This module deploys **container
+images** instead, which is the other way to run an agent on AgentCore - so it needs
+CodeBuild to run the Docker build and a small Lambda to drive it. The Lambda starts a
+CodeBuild job and polls until the build finishes, then returns, so Pulumi waits for
+the image to be ready before it creates the runtime.
+
+From the module root, create the Lambda folder:
 
 ```bash
 mkdir -p lambda/build-trigger
-# copy index.py from 01-my-first-agent/lambda/build-trigger/
 ```
 
-The Lambda starts a CodeBuild job and polls until the build finishes, then returns. Pulumi waits for the Lambda invocation to complete before moving on to the next resource.
+Create `index.py` inside `lambda/build-trigger` and copy the content in:
+
+```python
+import json
+import logging
+import time
+
+import boto3
+
+
+LOGGER = logging.getLogger()
+LOGGER.setLevel(logging.INFO)
+
+
+def handler(event, _context):
+    LOGGER.info("Received event: %s", json.dumps(event))
+
+    project_name = event["projectName"]
+    region = event.get("region")
+    poll_interval_seconds = int(event.get("pollIntervalSeconds", 15))
+
+    codebuild = boto3.client("codebuild", region_name=region)
+    response = codebuild.start_build(projectName=project_name)
+    build_id = response["build"]["id"]
+    LOGGER.info("Started build %s for project %s", build_id, project_name)
+
+    while True:
+        build_response = codebuild.batch_get_builds(ids=[build_id])
+        build = build_response["builds"][0]
+        status = build["buildStatus"]
+
+        if status == "SUCCEEDED":
+            LOGGER.info("Build %s succeeded", build_id)
+            return {
+                "buildId": build_id,
+                "status": status,
+                "imageDigest": build.get("resolvedSourceVersion"),
+            }
+
+        if status in {"FAILED", "FAULT", "STOPPED", "TIMED_OUT"}:
+            LOGGER.error("Build %s failed with status %s", build_id, status)
+            raise RuntimeError(f"CodeBuild {build_id} failed with status {status}")
+
+        LOGGER.info("Build %s status: %s", build_id, status)
+        time.sleep(poll_interval_seconds)
+```
 
 ## Step 6: Write the Pulumi infrastructure
 
-The infrastructure doubles everything from Module 1: two S3 buckets, two ECR repos, two IAM roles, two CodeBuild projects, two Lambda invocations, and two AgentCore Runtimes.
+Because we're deploying two agents, the infrastructure is doubled: two S3 buckets, two ECR repos, two IAM roles, two CodeBuild projects, two Lambda invocations, and two AgentCore Runtimes.
+
+We'll build this up section by section. Delete the starter code that `pulumi new`
+put in `index.ts` (TypeScript) or `__main__.py` (Python), then paste the sections
+below into that file in order.
 
 ### Configuration and data sources
 
@@ -2621,39 +2698,100 @@ pulumi.export(
 pulumi up
 ```
 
-This takes longer than Module 1 since two Docker images are being built sequentially. Expect 10-15 minutes. You'll see the specialist build start and complete before the orchestrator build begins.
+This takes a while - two Docker images are built sequentially in CodeBuild. Expect 10-15 minutes. You'll see the specialist build start and complete before the orchestrator build begins.
 
 ## Step 8: Test
 
-Grab the orchestrator ARN and run the test script:
+This script sends a simple prompt and a delegation prompt to the orchestrator, and
+(if you pass its ARN) hits the specialist directly too. Create `test_multi_agent.py`
+in the module root and copy the content in:
+
+```python
+#!/usr/bin/env python3
+"""Invoke the orchestrator (and optionally the specialist) and print the replies.
+
+Usage:
+    python test_multi_agent.py <orchestrator_arn> [specialist_arn]
+"""
+import json
+import sys
+
+import boto3
+from botocore.config import Config
+
+
+def invoke(client, arn, prompt):
+    print(f"\nPrompt: {prompt}")
+    print("Invoking (A2A flows can take a few minutes)...")
+    response = client.invoke_agent_runtime(
+        agentRuntimeArn=arn,
+        qualifier="DEFAULT",
+        payload=json.dumps({"prompt": prompt}),
+    )
+    status = response["ResponseMetadata"]["HTTPStatusCode"]
+    result = json.loads(response["response"].read().decode("utf-8"))
+    print(f"Status: {status}")
+    print(f"Response: {result.get('response', result.get('error', result))}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python test_multi_agent.py <orchestrator_arn> [specialist_arn]")
+        sys.exit(1)
+
+    orchestrator_arn = sys.argv[1]
+    specialist_arn = sys.argv[2] if len(sys.argv) > 2 else None
+    region = orchestrator_arn.split(":")[3]
+
+    # A2A calls in the orchestrator can run for minutes; bump the read timeout
+    # well past boto3's 60s default so the test doesn't give up early.
+    client = boto3.client(
+        "bedrock-agentcore",
+        region_name=region,
+        config=Config(read_timeout=900, connect_timeout=30, retries={"max_attempts": 0}),
+    )
+
+    # Simple query: the orchestrator answers directly.
+    invoke(client, orchestrator_arn, "Hello! Can you introduce yourself?")
+
+    # Complex query: the orchestrator delegates to the specialist (A2A).
+    invoke(
+        client,
+        orchestrator_arn,
+        "Ask the specialist: what is serverless computing and when should I use it?",
+    )
+
+    # Optionally hit the specialist directly to confirm it works on its own.
+    if specialist_arn:
+        invoke(
+            client,
+            specialist_arn,
+            "What are the pros and cons of event-driven architecture?",
+        )
+
+
+if __name__ == "__main__":
+    main()
+```
+
+The script needs `boto3` (Codespaces has it preinstalled, so you can skip this there):
+
+```bash
+pip install boto3
+```
+
+Grab both ARNs from the stack outputs and run it. `pulumi env run` injects the AWS
+credentials:
 
 ```bash
 export ORCH_ARN=$(pulumi stack output orchestratorRuntimeArn)
-python test_multi_agent.py $ORCH_ARN
-```
-
-Try two types of queries to verify the routing logic:
-
-1. A simple greeting: `"Hello, how are you?"` - the orchestrator handles this directly without calling the specialist
-2. A complex question: `"Analyze the trade-offs between microservices and monolithic architectures"` - the orchestrator delegates to the specialist
-
-You can tell which agent answered by checking the `"agent"` field in the response JSON. When the orchestrator delegates, you'll see `"agent": "specialist"` in the specialist's sub-response, wrapped in the orchestrator's response.
-
-You can also invoke the specialist directly to verify it works independently:
-
-```bash
 export SPEC_ARN=$(pulumi stack output specialistRuntimeArn)
-pulumi env run aws-bedrock-workshop/dev -- uv run python -c "
-import boto3, json, os
-client = boto3.client('bedrock-agentcore', region_name='us-east-1')
-r = client.invoke_agent_runtime(
-    agentRuntimeArn='$SPEC_ARN',
-    qualifier='DEFAULT',
-    payload=json.dumps({'prompt': 'What are the pros and cons of event-driven architecture?'}),
-)
-print(r['response'].read().decode())
-"
+pulumi env run aws-bedrock-workshop/dev -- python test_multi_agent.py $ORCH_ARN $SPEC_ARN
 ```
+
+The first prompt is a greeting the orchestrator answers itself. The second asks it
+to delegate, so the orchestrator calls the specialist over A2A and wraps the reply.
+The third invokes the specialist directly to confirm it works on its own.
 
 ## Try it yourself
 

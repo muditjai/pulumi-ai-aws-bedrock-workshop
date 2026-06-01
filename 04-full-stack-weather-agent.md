@@ -2,7 +2,7 @@
 ---
 # Module 4: The full stack: weather agent with tools and memory
 
-> **Stretch goal.** Skip this if you're keeping pace with the core path (Modules 0, 1, 3, 5) and come back to it later. It's a standalone Pulumi stack, so nothing downstream depends on it. The next core module is [Module 5: Cleanup](05-housekeeping.md).
+> **Stretch goal.** Skip this if you're keeping pace with the core path (Modules 0, 1, 2, 3, 5) and come back to it later. It's a standalone Pulumi stack, so nothing downstream depends on it. The next core module is [Module 5: Cleanup](05-housekeeping.md).
 
 **Duration:** ~40 minutes
 
@@ -108,8 +108,15 @@ npm install @pulumi/aws@7.23.0
 
 <div class="lang-tab" data-lang="python" markdown="1">
 
+The `pulumi new` template writes a `requirements.txt`. Replace it with the pinned
+dependencies, then install:
+
 ```bash
-uv add pulumi-aws>=7.23.0
+cat > requirements.txt <<'EOF'
+pulumi>=3.0.0,<4.0.0
+pulumi-aws>=7.23.0
+EOF
+pulumi install
 ```
 
 </div>
@@ -122,15 +129,17 @@ Set your unique stack name (replace `<id>` with the identifier you picked in Mod
 pulumi config set stackName agentcore-weather-<id>
 ```
 
+> Forgot your `<id>`? It's the 2-5 character identifier from [Module 0, Step 4](00-setup-and-orientation.md#step-4-pick-your-unique-identifier). Use the same one in every module so your resources don't collide with other participants'.
+
 ## Step 2: Write the weather agent code
 
-Create the agent source directory:
+Create a folder for the agent's source:
 
 ```bash
 mkdir -p agent-code
 ```
 
-Create `agent-code/weather_agent.py`. This is the full agent - every section is explained below.
+Create `weather_agent.py` inside `agent-code`. This is the full agent - every section is explained below.
 
 ### Imports and environment variables
 
@@ -508,7 +517,7 @@ if __name__ == "__main__":
 
 ## Step 3: Create requirements.txt and Dockerfile
 
-Create `agent-code/requirements.txt`:
+Create `requirements.txt` inside `agent-code`:
 
 ```text
 strands-agents
@@ -522,7 +531,7 @@ langchain-aws>=0.1.0
 rich
 ```
 
-Create `agent-code/Dockerfile`:
+Create `Dockerfile` inside `agent-code`:
 
 ```dockerfile
 FROM public.ecr.aws/docker/library/python:3.11-slim
@@ -553,11 +562,13 @@ The container runs as a non-root user (`bedrock_agentcore`) because AgentCore re
 
 The Memory resource starts empty. This Lambda seeds it with activity preferences during deployment so the agent has data to work with from the first invocation.
 
+From the module root, create the Lambda folder:
+
 ```bash
 mkdir -p lambda/init-memory
 ```
 
-Create `lambda/init-memory/index.py`:
+Create `index.py` inside `lambda/init-memory` and copy the content in:
 
 ```python
 import json
@@ -619,11 +630,13 @@ Pulumi invokes this Lambda once after the Memory resource is created. The `actor
 
 This Lambda starts a CodeBuild job and polls until it completes, giving Pulumi a synchronous way to wait for the Docker image to be ready before creating the AgentCore Runtime.
 
+From the module root, create the Lambda folder:
+
 ```bash
 mkdir -p lambda/build-trigger
 ```
 
-Create `lambda/build-trigger/index.py`:
+Create `index.py` inside `lambda/build-trigger` and copy the content in:
 
 ```python
 import json
@@ -672,7 +685,7 @@ def handler(event, _context):
 
 ## Step 6: Create the buildspec
 
-Create `04-weather-agent/buildspec.yml` in the project root:
+Create `buildspec.yml` in the module root:
 
 ```yaml
 version: 0.2
@@ -702,7 +715,7 @@ phases:
 
 ## Step 7: Write the Pulumi infrastructure
 
-Now for the infrastructure. We'll walk through it section by section. Each snippet is a direct excerpt from the solution files.
+Now for the infrastructure. We'll walk through it section by section. Each snippet is a direct excerpt from the solution files. Delete the starter code that `pulumi new` put in `index.ts` (TypeScript) or `__main__.py` (Python), then paste the sections below into that file in order.
 
 ### Configuration and data sources
 
@@ -2701,7 +2714,7 @@ pip install boto3
 <div class="lang-tab" data-lang="python" markdown="1">
 
 ```bash
-uv add boto3
+pip install boto3
 ```
 
 </div>
@@ -2793,4 +2806,4 @@ pulumi env run aws-bedrock-workshop/dev -- aws s3 cp s3://$(pulumi stack output 
 - The Memory API stores events tagged with actor IDs and session IDs, with configurable TTL
 - A Lambda invocation can seed Memory with initial data during deployment, so the agent has preferences from the very first invocation
 
-Next up: [Module 5 - Housekeeping](05-housekeeping.md)
+Next up: [Module 5: Cleanup](05-housekeeping.md)
